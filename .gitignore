@@ -1,0 +1,10 @@
+# All sorts of virtual environments
+*env*
+
+# Output from analysis
+*.pdf
+*.jpg
+*.png
+
+# Output from indexation
+*index.json
