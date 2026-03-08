@@ -1,6 +1,7 @@
+import os
 import json
 import argparse
-import sys
+from colorama import Fore, Style, init
 
 
 class DiskNavigator:
@@ -14,7 +15,10 @@ class DiskNavigator:
     def get_current_path_str(self):
         if not self.path_stack:
             return "/"
-        return "/" + "/".join([node["name"] for node in self.path_stack])
+        # Reconstruct path from the stack to ensure clean slashes
+        names = [node["name"] for node in self.path_stack[1:]]  # Skip root placeholder
+        names.append(self.current_node["name"])
+        return "/" + "/".join(names).replace("//", "/")
 
     def format_size(self, bytes_size):
         for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -23,49 +27,62 @@ class DiskNavigator:
             bytes_size /= 1024
 
     def list_contents(self):
-        print(f"\nLocation: {self.get_current_path_str()} (Indexed: {self.index_date})")
+        # Clear screen for a cleaner 'explorer' feel
+        os.system("cls" if os.name == "nt" else "clear")
 
-        # Sort children: Directories first, then by size
+        print(f"{Fore.MAGENTA}PATH: {Fore.GREEN}{self.get_current_path_str()}")
+        print(f"{Fore.MAGENTA}INDEX DATE: {Fore.WHITE}{self.index_date}\n")
+
         children = sorted(
             self.current_node.get("children", []),
             key=lambda x: (x["type"] != "directory", -x["size"]),
         )
-
         parent_size = self.current_node["size"]
 
-        print(f"{'TYPE':<10} {'NAME':<30} {'SIZE':<15} {'%'}")
-        print("-" * 65)
+        header = f"{'TYPE':<10} {'NAME':<35} {'SIZE':<15} {'%'}"
+        print(f"{Fore.BLUE}{header}")
+        print(f"{Fore.BLUE}{'-' * len(header)}")
 
         for item in children:
-            percentage = (item["size"] / parent_size * 100) if parent_size > 0 else 0
-            type_str = f"[{item['type'].upper()}]"
-            size_str = self.format_size(item["size"])
+            pct = (item["size"] / parent_size * 100) if parent_size > 0 else 0
+            color = Fore.YELLOW if item["type"] == "directory" else Fore.WHITE
+            type_label = f"[{item['type'].upper()}]"
 
             print(
-                f"{type_str:<10} {item['name']:<30} {size_str:<15} {percentage:>5.1f}%"
+                f"{Fore.CYAN}{type_label:<10} {color}{item['name']:<35} "
+                f"{Fore.GREEN}{self.format_size(item['size']):<15} {Fore.RED}{pct:>5.1f}%"
             )
 
     def navigate(self):
         while True:
             self.list_contents()
+            prompt = f"\n{Fore.YELLOW}({self.get_current_path_str()}){Fore.WHITE} >>> "
             try:
-                cmd_input = (
-                    input(f"\n({self.get_current_path_str()}) >>> ")
-                    .strip()
-                    .split(maxsplit=1)
-                )
-            except EOFError:
+                cmd_input = input(prompt).strip().split(maxsplit=1)
+            except (EOFError, KeyboardInterrupt):
                 break
 
             if not cmd_input:
                 continue
-
             cmd = cmd_input[0].lower()
             arg = cmd_input[1] if len(cmd_input) > 1 else None
 
-            if cmd == "exit" or cmd == "quit":
+            if cmd in ["exit", "quit"]:
                 break
-
+            elif cmd == "help":
+                print(f"\n{Fore.GREEN}Available Commands:")
+                print(
+                    f"{Fore.WHITE}ls          - Refresh and list current directory contents"
+                )
+                print(f"{Fore.WHITE}cd <dir>    - Enter a directory")
+                print(f"{Fore.WHITE}cd ..       - Go back to parent directory")
+                print(f"{Fore.WHITE}clear       - Clear the terminal screen")
+                print(f"{Fore.WHITE}exit        - Close the navigator")
+                input("\nPress Enter to continue...")
+            elif cmd == "clear":
+                os.system("cls" if os.name == "nt" else "clear")
+            elif cmd == "ls":
+                continue
             elif cmd == "cd":
                 if not arg or arg == ".":
                     continue

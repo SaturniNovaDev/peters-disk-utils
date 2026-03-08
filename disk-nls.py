@@ -2,39 +2,61 @@ import os
 import json
 import argparse
 from datetime import datetime
+import matplotlib
 import matplotlib.pyplot as plt
-from tqdm import tqdm
+from colorama import Fore, Style, init
 
+matplotlib.use("Agg")
 
-def build_index(path, progress_bar=None):
-    """
-    Recursively builds a nested dictionary of the file system.
-    """
-    name = os.path.basename(path) or path
+init(autoreset=True)
+
+# Store errors globally to report at the end
+encountered_errors = []
+
+# Filter to ignore system directories on Linux
+IGNORE_DIRS = {'/proc', '/sys', '/dev', '/run', '/snap', '/var/lib/lxd'}
+
+def build_index(path, verbose=False):
+    # Check if the current path is in the ignore list
+    if path.rstrip(os.sep) in IGNORE_DIRS:
+        if verbose: print(f"{Fore.YELLOW}Skipping virtual/system dir: {path}")
+        return {"name": os.path.basename(path), "size": 0, "type": "directory", "children": []}
+
+    name = os.path.basename(path.rstrip(os.sep)) or path
     node = {"name": name, "size": 0, "type": "directory", "children": []}
-
+    
     try:
+        # Use a context manager to ensure the iterator is closed immediately
         with os.scandir(path) as it:
             for entry in it:
-                if progress_bar is not None:
-                    progress_bar.update(1)
-
                 try:
+                    # MODE: One-line Status
+                    if not verbose:
+                        status = f"{Fore.CYAN}Indexing: {Fore.WHITE}{entry.path[:60]}"
+                        print(f"\r{status:<80}", end="", flush=True)
+                    else:
+                        print(f"{Fore.CYAN}Indexing {Fore.WHITE}{entry.path} ... ", end="", flush=True)
+
                     if entry.is_file(follow_symlinks=False):
                         f_size = entry.stat().st_size
-                        node["children"].append(
-                            {"name": entry.name, "size": f_size, "type": "file"}
-                        )
+                        node["children"].append({"name": entry.name, "size": f_size, "type": "file"})
                         node["size"] += f_size
+                        if verbose: print(f"{Fore.GREEN}Done")
+                        
                     elif entry.is_dir(follow_symlinks=False):
-                        subdir = build_index(entry.path, progress_bar=progress_bar)
+                        # RECURSION POINT: We only call this ONCE per directory
+                        if verbose: print(f"{Fore.YELLOW}Descending")
+                        subdir = build_index(entry.path, verbose=verbose)
                         node["children"].append(subdir)
                         node["size"] += subdir["size"]
-                except (PermissionError, OSError):
+                        
+                except Exception as e:
+                    encountered_errors.append(f"Error in {entry.path}: {e}")
+                    if verbose: print(f"{Fore.RED}Failed")
                     continue
-    except (PermissionError, OSError):
-        pass
-
+    except Exception as e:
+        encountered_errors.append(f"Access Denied: {path} ({e})")
+        
     return node
 
 
@@ -77,26 +99,37 @@ def generate_visuals(index_data, output_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--target", type=str, required=True)
+    parser.add_argument("--output", type=str, default="analysis.pdf")
     parser.add_argument(
-        "--target", type=str, required=True, help="Disk unit (C: or D:)"
-    )
-    parser.add_argument(
-        "--output", type=str, default="analysis.pdf", help="Output PDF/Image"
+        "--verbose",
+        action="store_true",
+        help="Show full log instead of one-line status",
     )
     args = parser.parse_args()
 
-    # Normalize path for Windows
     target = os.path.abspath(args.target)
 
-    print(f"Indexing {target}... This may take a while for large drives.")
+    # Start storing index in full_structure
+    print(f"{Fore.YELLOW}Starting scan of {target}...")
+    full_structure = build_index(target, verbose=args.verbose)
 
-    # Using a simple spinner/total-less bar because total files is unknown initially
-    with tqdm(
-        unit="files", bar_format="{l_bar}{bar:20}{r_bar}", colour="green"
-    ) as pbar:
-        full_structure = build_index(target, progress_bar=pbar)
+    # Clean up the status line if not in verbose mode
+    if not args.verbose:
+        print(f"\r{' ' * 100}\r", end="", flush=True)
 
-    # Add metadata
+    # Final Summary Reporting
+    print(f"\n\n{Fore.YELLOW}{'='*20} SCAN SUMMARY {'='*20}")
+    if encountered_errors:
+        print(f"{Fore.RED}Encountered {len(encountered_errors)} errors during scan:")
+        for err in encountered_errors[:20]:  # Show first 20 to avoid flooding
+            print(f"{Fore.RED} - {err}")
+        if len(encountered_errors) > 20:
+            print(f"{Fore.RED} ... and {len(encountered_errors)-20} more.")
+    else:
+        print(f"{Fore.GREEN}Scan completed with 0 errors.")
+
+    # Metadata and JSON Export
     final_output = {
         "index_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "root": target,
@@ -104,12 +137,11 @@ if __name__ == "__main__":
         "structure": full_structure,
     }
 
-    # Save JSON
-    json_filename = "disk_index.json"
+    json_filename = "disk-index.json"
     with open(json_filename, "w", encoding="utf-8") as f:
         json.dump(final_output, f, indent=4)
 
-    print(f"Index metadata saved to {json_filename}")
+    print(f"\n{Fore.GREEN}Index metadata saved to {json_filename}")
 
     # Save Visual
     generate_visuals(full_structure, args.output)
