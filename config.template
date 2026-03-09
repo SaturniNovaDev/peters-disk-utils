@@ -1,0 +1,28 @@
+; -- Default configuration template --
+; Rename to 'config.ini' to start using this configuration
+
+[GENERAL]
+; Set to True for full logs, False for single-line status
+Verbose = False
+; How many errors to show in the terminal summary
+ErrorLimit = 20
+; Whether to print the error summary at the end of the scan
+ShowSummary = True
+
+[PATHS]
+; Default names for your outputs
+JsonOutput = disk-index.json
+ChartOutput = analysis.pdf
+; Log file for permission errors
+LogFile = nls-errors.log
+
+; Default directories to scan if no --target param is provided 
+[DEFAULT_TARGETS]
+Windows = C:/Users
+Linux = /home
+
+[EXCLUDE]
+; Linux-specific virtual/system files
+LinuxDirs = /proc, /sys, /dev, /run, /snap, /var/lib/lxd
+; Windows-specific system files that often cause permission errors
+WindowsDirs = C:/System Volume Information, C:/$Recycle.Bin, C:/Windows/CSC

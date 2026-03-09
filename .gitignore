@@ -1,10 +1,18 @@
 # All sorts of virtual environments
 *env*
 
+# Output from indexation
+index*.json
+*.json
+
 # Output from analysis
 *.pdf
 *.jpg
 *.png
 
-# Output from indexation
-*index.json
+# User Configuration File
+config.ini
+
+# Log files
+*error*
+*.log

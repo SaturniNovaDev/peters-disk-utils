@@ -1,7 +1,17 @@
 import os
 import json
 import argparse
-from colorama import Fore, Style, init
+import configparser
+from colorama import Fore, init
+
+init(autoreset=True)
+
+# Load shared configuration
+config = configparser.ConfigParser()
+config.read("config.ini")
+
+# Get default source from config, fallback to disk-index.json if not found
+DEFAULT_SOURCE = config.get("PATHS", "JsonOutput", fallback="disk-index.json")
 
 
 class DiskNavigator:
@@ -123,11 +133,22 @@ class DiskNavigator:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Interactive Disk Index Navigator")
+    # Source is now optional because we have a default from config.ini
     parser.add_argument(
-        "--source", type=str, required=True, help="Path to the disk_index.json file"
+        "--source",
+        type=str,
+        default=DEFAULT_SOURCE,
+        help=f"Path to JSON index (Default: {DEFAULT_SOURCE})",
     )
     args = parser.parse_args()
+
+    if not os.path.exists(args.source):
+        print(f"{Fore.RED}Error: Source file '{args.source}' not found.")
+        print(
+            f"{Fore.YELLOW}Tip: Run disk-nls.py first or check your config.ini [PATHS] settings."
+        )
+        exit(1)
 
     try:
         with open(args.source, "r", encoding="utf-8") as f:
@@ -135,7 +156,7 @@ if __name__ == "__main__":
 
         nav = DiskNavigator(data)
         nav.navigate()
-    except FileNotFoundError:
-        print(f"Error: Could not find file {args.source}")
     except json.JSONDecodeError:
-        print("Error: Failed to parse JSON. File might be corrupted.")
+        print(
+            f"{Fore.RED}Error: Failed to parse '{args.source}'. File may be corrupted."
+        )
