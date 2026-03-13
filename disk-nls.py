@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import json
 import argparse
@@ -140,6 +141,9 @@ if __name__ == "__main__":
     target = os.path.abspath(args.target)
     if not os.path.exists(target):
         print(f"{Fore.RED}Error: Target path '{target}' does not exist.")
+        print(
+            f"{Fore.YELLOW}Please check your --target argument or the [DEFAULT_TARGETS] in config.ini."
+        )
         exit(1)
 
     print(f"{Fore.YELLOW}Target identified: {Fore.WHITE}{target}")
@@ -172,6 +176,13 @@ if __name__ == "__main__":
             f"{Fore.WHITE}Duration:   {Fore.CYAN}{final_output['scan_duration_seconds']}s"
         )
         print(f"{Fore.WHITE}Log File:   {Fore.CYAN}{config.get('PATHS', 'LogFile')}")
+        if final_output["scan_duration_seconds"] > 60:
+            print(
+                f"{Fore.YELLOW}Note: Long scan times may indicate a very large target or performance issues. Consider excluding more directories or running with verbose mode for detailed logging."
+            )
+        print(
+            f"{Fore.BLUE}Tip: If you get permission errors during scans, consider skipping system directories or running the tool with elevated permissions (e.g., as administrator or with sudo)."
+        )
 
     generate_visuals(full_structure, args.output)
     print(f"{Fore.GREEN}Index and chart saved successfully.")

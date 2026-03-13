@@ -1,18 +1,23 @@
-# All sorts of virtual environments
-*env*
+# Python Bytecode
+__pycache__/
+*.py[cod]
 
-# Output from indexation
-index*.json
-*.json
+# Environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+.ENV/
 
-# Output from analysis
-*.pdf
-*.jpg
-*.png
-
-# User Configuration File
+# User-specific Config
 config.ini
 
-# Log files
-*error*
+# Application Outputs
+*.json
+*.pdf
 *.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
